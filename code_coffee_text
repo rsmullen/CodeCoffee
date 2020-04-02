@@ -1,0 +1,174 @@
+## This is a companion text file for the 2 April 2020 Intro to UA HPC Code Coffee Presentation because it is easier to copy text than a PDF. :)
+## Typos not intended but possible
+## From Rachel Smullen
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### Resources
+# Find available compute resources
+va
+
+# Find available storage resources
+uquota
+
+# Find the node usage
+nodes-busy
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### Jobs
+# submit job
+qsub < myscript.sh
+
+# check current output
+qpeek jobid
+
+# check job status
+qstat -ast -u $USER
+
+# delete job
+qdel jobid
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### Loading software
+# available software
+module avail
+
+# load software
+module load module_name
+
+# list loaded software
+module list
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### Run an interactive job
+qsub -I -X -W group_list=kkratter -q standard -l select=1:ncpus=16:ngpus=1:mem=250gb:pcmem=16gb -l walltime=48:0:0 -l place=pack:shared
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### Run a single node job (credit Jenn Kadowaki)
+
+---------script.sh-------------
+ Your job will use 1 node, 28 cores, and 224gb of memory total.
+#PBS -q standard
+#PBS -l select=1:ncpus=16:mem=250gb:ngpus=1
+
+### Specify a name for the job
+#PBS -N bert_olid_predict
+
+### Specify the group name
+#PBS -W group_list=dfz
+
+### Used if job requires partial node only
+#PBS -l place=pack:exclhost
+
+### CPUtime required in hhh:mm:ss.
+### Leading 0's can be omitted e.g 48:0:0 sets 48 hours
+#PBS -l cput=32:00:00
+
+### Walltime is how long your job will run
+#PBS -l walltime=02:00:00
+
+### Joins standard error and standard out
+#PBS -o bert_olid_predict.o
+#PSB -e bert_olid_predict.e
+
+### Sends e-mail when job aborts/ends
+#PBS -m ae
+#PBS -M jkadowaki@email.arizona.edu
+
+##########################################################
+
+### DIRECTORIES / NAMES ###
+USER=$(basename $HOME)
+export CONTAINER=/extra/jkadowaki/SemEval2019/container/nvidia-tensorflow.18.09-py3.simg
+
+cd /extra/$USER/SemEval2019
+module load singularity
+
+date +"Start - %a %b %e %H:%M:%S %Z %Y"
+singularity exec --nv $CONTAINER bash predict_bert.sh
+date +"End - %a %b %e %H:%M:%S %Z %Y"
+------------------------------------------
+
+# submit
+qsub < script.sh
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### Run an embarrassingly parallel job (credit Rachel Sullen
+
+---------script.sh---------------
+## Run on windfall queue
+#PBS -q windfall 
+## Use 2 CPUs per job
+#PBS -l select=1:ncpus=2:mem=32gb:pcmem=16gb
+
+#PBS -N catalog
+
+#PBS -W group_list=kkratter
+
+## Don't care if other people run jobs on the same node
+#PBS -l place=pack:shared
+
+## Run for 24 hours
+#PBS -l walltime=24:00:00
+
+## Put error/output files in the folders
+#PBS -e err/
+#PBS -o out/
+
+
+### JOB ARRAY: set sub_jobs with indexes 1-100
+#PBS -J 1-100
+
+
+#### My code
+
+# Make sure I'm in the right directory
+homedir=/rsgrps/brant/rsmullen/BinaryFormation/density_7E-20_new2/
+cd $homedir
+
+# Make sure the python I want is loaded
+export PATH="/home/u14/rsmullen/anaconda3/bin:$PATH"
+export PYTHONPATH=/home/u14/rsmullen/anaconda3/pkgs:$PYTHONPATH
+export PYTHONPATH=/home/u14/rsmullen/.local/lib:$PYTHONPATH
+
+# Run the program for individual sub-job ${PBS_ARRAY_INDEX}
+python make_catalog.py ${PBS_ARRAY_INDEX}
+-------------------------------------------------------
+
+# submit
+qsub < script.sh
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+### Run a true parallel job (credit Rixin Li)
+
+---------script.sh---------------
+### Set up Job
+#PBS -N Z3P5t01_HR
+#PBS -W group_list=kmkshare
+#PBS -q el_high_pri
+#PBS -m bea
+#PBS -l place=free:shared
+#PBS -l walltime=120:00:00
+#PBS -l cput=15360:00:00
+
+### Select 8 full CPU nodes
+#PBS -l select=8:ncpus=16:mem=64gb:pcmem=4gb
+
+### Load modules, including MPU for parallel
+module load openmpi3 fftw
+
+### set directory for job execution
+cd /home/u5/rixin/runs/kkruns/tauZmap_SI/Z3P5t01_HR/
+
+### run your parallel executable program
+mpirun -np 128 ./Athena -i ./athinput.parsg_strat2d -t 120:00:00 > output.txt 2>& 1
+-------------------------------------------------------
+
+# submit
+qsub < script.sh
